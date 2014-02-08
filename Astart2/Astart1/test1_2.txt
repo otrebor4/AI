@@ -1,0 +1,22 @@
+Oradea	Zerind	71	0	0
+Oradea	Sibiu	151	0	0
+Zerind	Arad	75	0	0
+Arad	Timisoara	111	0	0
+Arad	Sibiu	140	0	0
+Sibiu	Fagaras	99	0	0
+Sibiu	Rimnicu Vilcea	80	0	0
+Fagaras	Bucharest	211	0	0
+Rimnicu Vilcea	Pitesti	97	0	0
+Fimnicu Vilcea	Craiova	146	0	0
+Pitesti	Craiova	138	0	0
+Pitesti	Bucharest	101	0	0
+Craiova	Dobreta	120	0	0
+Dobreta	Mehadia	75	0	0
+Mehadia	Lugoj	70	0	0
+Lugoj	Timisoara	111	0	0
+Bucharest	Giurgin	90	0	0
+Bucharest	Urziceni	85	0	0
+Urziceni	Vaslui	92	0	0
+Vaslui	Iasi	92	0	0
+Iasi	Neamt	87	0	0
+Hirsova	Eforie	86	0	0
