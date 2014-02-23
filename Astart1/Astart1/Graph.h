@@ -1,6 +1,18 @@
 #ifndef GRAPH_H
 #define GRAPH_H
-
+//
+//  Graph.h
+//
+//  Created by Roberto Flores.
+//  Copyright (c) 2013 Roberto Flores. All rights reserved.
+//
+//  Graph template class,
+//  GraphType supported.
+//      Undirected Graph:
+//      Directed Graph  :
+//      Mutable Tree    : new edges have priority and will raplace conflicting edge with the new one keping tree structure
+//      Tree            : new edges that will break the tree structure won't be added
+//
 #include <list>
 using std::list;
 
@@ -71,7 +83,7 @@ public:
 
 	~vertex()
 	{
-		vector<Edge *> es;
+        std::vector<Edge *> es;
 		for(Edge * e : edgesIn){
 			es.push_back(e);
 		}
@@ -177,11 +189,28 @@ private:
 		v1->AddEdge(v2,w);
 
 	}
-
+    
+    //===================================================
+    void UpdateEdgeUndirected(DATA_TYPE a, DATA_TYPE b, EDGE_DATA w)
+    {
+        Edge * e = getEdge(a, b);
+        if (e != NULL)
+            e->weight = w;
+        e = getEdge(b, a);
+        if (e != NULL)
+            e->weight = w;
+    }
+    void UpdateEdgeDirected(DATA_TYPE a, DATA_TYPE b, EDGE_DATA w)
+    {
+        Edge * e = getEdge(a, b);
+        if (e != NULL)
+            e->weight = w;
+    }
+    
 public:
 	Graph(){}
 	
-	Graph(Graph & other)
+	Graph(Graph const & other)
 	{
 		for(Vertex * v : other.vertextList)
 		{
@@ -205,7 +234,7 @@ public:
 	}
 
 	template<GraphType TYPE>
-	void AddEdge(DATA_TYPE a, DATA_TYPE b, EDGE_DATA w = default(EDGE_DATA))
+	void AddEdge(DATA_TYPE a, DATA_TYPE b, EDGE_DATA w = EDGE_DATA())
 	{
 		switch (TYPE)
 		{
@@ -224,7 +253,7 @@ public:
 		}
 	}
 
-	void AddEdge(DATA_TYPE a, DATA_TYPE b, EDGE_DATA w = default(EDGE_DATA))
+	void AddEdge(DATA_TYPE a, DATA_TYPE b, EDGE_DATA w = EDGE_DATA())
 	{
 		switch (GRAPHTYPE)
 		{
@@ -265,8 +294,27 @@ public:
 			AddVertex(b);
 		AddEdge(a,b,w);
 	}
-
-	Edge * getEdges(DATA_TYPE a, DATA_TYPE b)
+    
+    void UpdateEdge(DATA_TYPE a, DATA_TYPE b, EDGE_DATA w)
+    {
+        switch (GRAPHTYPE)
+		{
+            case Undirected:
+                UpdateEdgeUndirected(a,b,w);
+                break;
+            case Directed:
+                UpdateEdgeDirected(a,b,w);
+                break;
+            case Tree:
+                UpdateEdgeDirected(a,b,w);
+            case MutableTree:
+                UpdateEdgeDirected(a,b,w);
+            default:
+                break;
+		}
+    }
+    
+	Edge * getEdge(DATA_TYPE a, DATA_TYPE b)
 	{
 		Vertex * _a = getVertex(a);
 		for(Edge * e : _a->edgesOut)
@@ -281,11 +329,15 @@ public:
 	{
 		return findVertex(a);
 	}
+    int size()
+    {
+        return (int)vertextList.size();
+    }
 	list<Vertex *> getVertexs()
 	{
 		return vertextList;
 	}
-	list<Edge *> getEdges()
+    list<Edge *> getEdges() const
 	{
 		list<Edge *> edges;
 		for(Vertex * v : vertextList)
@@ -307,7 +359,7 @@ public:
 
 	void display()
 	{
-		for each(Vertex * x in vertextList)
+		for(Vertex * x : vertextList)
 		{
 			x->display();
 		}

@@ -64,6 +64,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="ant_op.h" />
     <ClInclude Include="AVLTree.h" />
     <ClInclude Include="A_star.h" />
     <ClInclude Include="Graph.h" />

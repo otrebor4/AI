@@ -1,6 +1,14 @@
 #ifndef AVLTREE_H
 #define AVLTREE_H
-
+//
+//  AVLTree.h
+//
+//  Created by Roberto Flores.
+//  Copyright (c) 2013 Roberto Flores. All rights reserved.
+//
+//  AVLTree template class,
+//
+//
 
 template<class T>
 class AVLTree{
@@ -11,12 +19,12 @@ private:
 		return out;
 	}
 
-	template<class T>
+	template<class K>
 	class Node
 	{
 	public:
-		Node<T> * right;
-		Node<T> * left;
+		Node<K> * right;
+		Node<K> * left;
 		T data;
 		int height;
 		Node()
@@ -26,7 +34,7 @@ private:
 			left = NULL;
 			height = 0;
 		}
-		Node(T d)
+		Node(K d)
 		{
 			data = d;
 			right = NULL;
