@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nqueens", "nqueens\nqueens.vcxproj", "{59A417B5-397B-4B17-99AD-6B4643A1268C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		64|Win32 = 64|Win32
+		64|x64 = 64|x64
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.64|Win32.ActiveCfg = 64|Win32
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.64|Win32.Build.0 = 64|Win32
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.64|x64.ActiveCfg = 64|x64
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.64|x64.Build.0 = 64|x64
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.Debug|Win32.Build.0 = Debug|Win32
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.Debug|x64.ActiveCfg = Debug|x64
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.Debug|x64.Build.0 = Debug|x64
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.Release|Win32.ActiveCfg = Release|Win32
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.Release|Win32.Build.0 = Release|Win32
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.Release|x64.ActiveCfg = Release|x64
+		{59A417B5-397B-4B17-99AD-6B4643A1268C}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
