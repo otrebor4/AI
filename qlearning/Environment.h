@@ -1,5 +1,5 @@
-#ifndef ENVIRONMENT_H
-#define ENVIRONMENT_H
+#ifndef QLearning_H
+#define QLearning_H
 
 #include <fstream>
 #include <iostream>
@@ -7,7 +7,13 @@
 #include <sstream>
 #include <vector>
 #include <map>
+#include <cstdlib>
+#include <iomanip>
 
+float getRandF()
+{
+	return (((float)rand())/((float)RAND_MAX));
+}
 
 int getRand(int min,int max)
 {
@@ -16,17 +22,17 @@ int getRand(int min,int max)
 
 typedef std::pair<int,int> position;
 
-const int MAX_DIR = 9;
+const int MAX_DIR = 8;
 const position DIRECTIONS[MAX_DIR]={
-	position(  0,  0),  /* NM */
-	position( -1,  0),	/* N  */
-	position( -1,  1),	/* NE */
-	position(  0,  1),	/* E  */
-	position(  1,  1),	/* SE */
-	position(  1,  0),	/* S  */
-	position(  1, -1),	/* SW */
-	position(  0, -1),	/* W  */
-	position( -1, -1)	/* NW */
+	//position(  0,  0),  /* NM */
+	position(   0,  1),	/* N  */
+	position(   1,  1),	/* NE */
+	position(   1,  0),	/* E  */
+	position(   1, -1),	/* SE */
+	position(   0, -1),	/* S  */
+	position(  -1, -1),	/* SW */
+	position(  -1,  0),	/* W  */
+	position(  -1,  1)	/* NW */
 };
 
 struct data
@@ -34,9 +40,99 @@ struct data
 	float Q[MAX_DIR];
 	float maxQ;
 	float sumQ;
+
+	float initialReward;
+	float reward;
+
+	bool visided;
+	int visits;
+	//float reward;
 };
 
-class environment 
+
+int readFile( std::string filename, 
+	int & N, int & T, int & P,						//file line 1: gridsize, # of trolls, #of ponies 
+	std::pair<int,int> & excape,					//excape location
+	std::vector<std::pair<int,int> > & ponies,		//ponies locations
+	std::vector<std::pair<int,int> > & obstructions,//obstructoins locations
+	std::vector<std::pair<int,int> > & trolls)		//trolls locatoins
+{
+	std::ifstream file(filename.c_str());
+	if(file.is_open())
+	{
+		bool error = false;
+		std::string line;
+		//read first line
+		// N T P // N = size of the QLearning, G: number of trolls, P: number of ponies
+		if(std::getline(file,line))
+		{
+			std::stringstream linein(line);
+			error = !(linein >> N >> T >> P);
+		}else{error = true;}
+		if(error)
+			return 1;
+
+		//read excape location
+		if(std::getline(file, line))
+		{
+			std::stringstream linein(line);
+			error = !(linein >> excape.first >> excape.second);
+		}else{error = true;}
+		if(error)
+			return 2;
+			
+		//read ponies locations
+		if(std::getline(file,line))
+		{
+			std::stringstream linein(line);
+				
+			while(!linein.eof())
+			{
+				position pos;
+				error = !(linein >> pos.first >> pos.second);
+				if(!error)
+					ponies.push_back(pos);
+			}
+		}else{error = true;}
+		if(error)
+			return 3;
+
+		//read obstruction locations
+		if(std::getline(file,line))
+		{
+			std::stringstream linein(line);
+			while(!linein.eof())
+			{
+				position pos;
+				error = !(linein >> pos.first >> pos.second);
+				if(!error && pos.first != -1 && pos.second != -1)
+					obstructions.push_back(pos);
+			}
+		}else{error = true;}
+		if(error)
+			return 4;
+
+		//read trolls locations
+		if(std::getline(file,line))
+		{
+			std::stringstream linein(line);
+			while(!linein.eof())
+			{
+				position pos;
+				error = !(linein >> pos.first >> pos.second);
+				if(!error)
+					trolls.push_back(pos);
+			}
+		}else{error = true;}
+		if(error)
+			return 5;
+	}
+	file.close();
+	return 0;
+}
+	
+
+class QLearning 
 {
 private:
 	//Rewards
@@ -49,15 +145,12 @@ private:
 	float Alpha;
 	float Gamma;
 
-	int N; //environment size
+	int N; //QLearning size
 	int T; //number of trolls
 	int P; // number of ponies
 
 	// Excape cordinate, X,Y
 	position E;
-
-	//trolls positions
-	std::vector<position> trolls;
 
 	//ponies positions x y
 	std::vector<position> ponies;
@@ -65,8 +158,12 @@ private:
 	//obstruction locations
 	std::vector<position> obs;
 
+	//trolls positions
+	std::vector<position> trolls;
+
 	//burglar position
 	position B;
+	
 	
 	//grid knowlege data
 	std::map< position, data> memory;
@@ -78,7 +175,10 @@ private:
 		return code;
 	}
 
-	//pares file and build the environment from the data readed
+	//learning variable
+	float multiplier;
+
+	//pares file and build the QLearning from the data readed
 	//the data is writed to the private variables
 	//N,T,P,E,trolls,ponies,obs,B,
 	int readFile( std::string filename)
@@ -89,7 +189,7 @@ private:
 			bool error = false;
 			std::string line;
 			//read first line
-			// N T P // N = size of the environment, G: number of trolls, P: number of ponies
+			// N T P // N = size of the QLearning, G: number of trolls, P: number of ponies
 			if(std::getline(file,line))
 			{
 				std::stringstream linein(line);
@@ -142,7 +242,6 @@ private:
 			if(std::getline(file,line))
 			{
 				std::stringstream linein(line);
-				
 				while(!linein.eof())
 				{
 					position pos;
@@ -180,12 +279,31 @@ private:
 				position pos(x,y);
 				memory[pos] = data();
 				for(int i = 0; i < MAX_DIR; i++){
-					memory[pos].Q[i] = 0;
+					memory[pos].Q[i] = .5f;
 				}
 				memory[pos].maxQ = 0;
 				memory[pos].sumQ = 0;
+				
+				memory[pos].initialReward = GetReward(pos);
+				memory[pos].reward = memory[pos].initialReward;
+				memory[pos].visided = false;
+				memory[pos].visits = 0;
 			}
 		}
+	}
+
+	//reset visited state
+	void resetStates()
+	{
+		for(int y = 0; y < N; y++){
+			for(int x = 0; x < N; x++){
+				position pos(x,y);
+				memory[pos].visided = false;
+				//memory[pos].visits = 0;
+				memory[pos].reward = memory[pos].initialReward;
+			}
+		}
+		multiplier = 1;
 	}
 
 	//return what is in the word by the given x,y cordinades
@@ -216,28 +334,90 @@ private:
 	//check if a pair value exist on vecto list
 	bool Contains(std::vector<position> list, position value)
 	{
-		for(unsigned int i = 0; i < ponies.size(); i++){
-			if( ponies[i].first == value.first && ponies[i].second == value.second)
+		for(unsigned int i = 0; i < list.size(); i++){
+			if( list[i].first == value.first && list[i].second == value.second)
 				return true;
 		}
 		return false;
 	}
 
+	int index(std::vector<position> list, position value)
+	{
+		for(unsigned int i = 0; i < list.size(); i++){
+			if( list[i].first == value.first && list[i].second == value.second)
+				return i;
+		}
+		return -1;
+	}
+	
 	//check if from pos it can move in the direction
 	bool validMove(position pos, int dir){
 		int x = DIRECTIONS[dir].first+pos.first;
 		int y = DIRECTIONS[dir].second+pos.second;
-		return !(Contains(obs, position(x,y)));
+		return !(Contains(obs, position(x,y))) && x >= 0 && y >= 0 && x < N && y < N && !(memory[position(x,y)].visided);
 	}
+
 
 	//chose a random action
 	int getRandomAction( position pos )
 	{
-		int action;	
+		int action;
+		std::vector<bool> checked(MAX_DIR,false);
 		do {
+			int i= 0;
 			action = getRand(0,MAX_DIR);
+			checked[action] = true;
+			for(i = 0; i < MAX_DIR; i++)
+				if(checked[i] ==false)
+					break;
+			if( i == MAX_DIR)
+				return -1;
 		} while (!validMove(pos, action));
 		return action;
+	}
+
+	//
+	int chooseAction( position pos, bool greedy)
+	{
+		findMaxQ(pos);
+		updateSum(pos);
+		int action;
+		int count = 0;
+		if(greedy){
+
+			for(action = 0; action < MAX_DIR; action++)
+			{
+				if(memory[pos].maxQ == memory[pos].Q[action])
+					if(validMove(pos, action))
+						return action;
+			}
+		}else{
+			float prob;
+			action = getRandomAction(pos);
+
+			for (count = 0 ; count < MAX_DIR ; count++) {
+				prob = (memory[pos].Q[action] / memory[pos].sumQ);
+				if (validMove(pos, action)) {
+					if (prob > getRandF()) {
+						return action;
+					}
+				}
+				if (action++ == MAX_DIR) 
+					action = 0;
+			 }
+		}
+		if (count == MAX_DIR) 
+			action = getRandomAction(pos);
+		return action;
+	}
+
+	//
+	void updateReward(position pos)
+	{
+		if(memory[pos].reward > 1)
+			memory[pos].reward  = 1;
+		else
+			memory[pos].reward /= 2;
 	}
 
 	//for the given position return reward value
@@ -255,23 +435,10 @@ private:
 		default:
 			return R_Otl;
 		}
+		return -1;
 	}
 
-	//update learning 
-	void updateFunction(position pos, int action )
-	{
-		position npos (pos.first + DIRECTIONS[action].first, pos.second + DIRECTIONS[action].first);
 
-		float reward = GetReward(pos);
-
-		//update maxQ value for the position given
-		findMaxQ( npos);
-
-		//Q learning equation
-		memory[pos].Q[action] += Alpha * (reward + (Gamma * memory[npos].maxQ) - memory[pos].Q[action]);
-		
-		updateSum(pos);
-	}
 
 	//find max Q value for the given position
 	void findMaxQ(position pos)
@@ -295,15 +462,33 @@ private:
 		}
 	}
 
+	//
+	position getRandomPosition()
+	{
+		position p;
+		p.first = getRand(0,N);
+		p.second = getRand(0,N);
+		return p;
+	}
+
 public:
 
-	environment(std::string filename)
+	QLearning(std::string filename)
 	{
+		R_Esc = 110; //reward for escaping
+		R_Pon = 100; //reward for ponies
+		R_Tro = -110; //reward for trolls
+		R_Otl = 1; //reward for open field
+
+		Alpha = 0.75f;
+		Gamma = 0.5f;
+
 		readFile(filename);
 		initState();
+		resetStates();
 	}
 	
-	//draw current environment state to a display ostream
+	//draw current QLearning state to a display ostream
 	void printState(std::ostream & display)
 	{
 		for(int y = -1; y < N+1; y++){
@@ -319,10 +504,132 @@ public:
 		}
 	}
 
-	void Update()
+	void printQState(std::ostream & display)
 	{
-		//std::pair<int, int> nextPos = getNextPos();
+		resetStates();
+		for(int y = -1; y < N+1; y++){
+			for(int x = -1; x < N+1; x++){
+				if( y == -1 || x == -1 || y == N || x == N){
+					display << "#####";
+				}else{
+					position p(x,y);
+					findMaxQ(p);
+					display << std::setw(2) << DIRECTIONS[chooseAction(position(x,y),true)].first<< "," << std::setw(2)<<DIRECTIONS[chooseAction(position(x,y),true)].second;
+				}
+				display << " ";
+			}
+			display << "\n";
+		}
+	}
+	
+	void printPath(std::ostream & display)
+	{
+		std::vector<position> path = GeneratePath();
+		resetStates();
+		for(int y = -1; y < N+1; y++){
+			for(int x = -1; x < N+1; x++){
+				if( y == -1 || x == -1 || y == N || x == N){
+					display << "##";
+				}else{
+					position p(x,y);
+					int i = index(path,p);
+					if( i != -1){
+						char c = getEntity(p.first, p.second);
+						if(c == '-')
+							display << std::fixed << std::setw(2) << i;
+						else
+							display << std::fixed << std::setw(2) << c;
+					}
+					else
+						display << "--";
+				}
+				display << " ";
+			}
+			display << "\n";
+		}
+	}
 
+	//
+	void learningPhase(int steps){
+		int count = 0;
+		int action = -1;
+		position pos = getRandomPosition();
+
+		while(count < steps)
+		{
+			action = chooseAction(pos,false);
+			if(action == -1){
+				resetStates();
+				pos = getRandomPosition();
+			}else{
+				updateFunction(pos, action);
+				pos.first += DIRECTIONS[action].first;
+				pos.second+= DIRECTIONS[action].second;
+				if( getEntity(pos.first, pos.second) == 'E'){
+					resetStates();
+					pos = getRandomPosition();
+				}
+			}
+			count++;
+		}
+	}
+
+	std::vector<position> GeneratePath()
+	{
+		std::vector<position> path;
+
+		int MAXSTEPS = 100000;
+		int count = 0;
+		int action = -1;
+		position pos = getRandomPosition();
+		path.push_back(pos);
+		
+		do{
+			action = chooseAction(pos,true);
+			if(action == -1){
+				resetStates();
+				path.clear();
+				pos = getRandomPosition();
+				path.push_back(pos);
+			}else{
+				
+				updateFunction(pos, action);
+				pos.first += DIRECTIONS[action].first;
+				pos.second+= DIRECTIONS[action].second;
+				path.push_back(pos);
+				//if( getEntity(pos.first, pos.second) == 'E'){
+				//	resetVisited();
+				//	pos = getRandomPosition();
+				//}
+			}
+
+			count++;
+		}while(getEntity(pos.first,pos.second) != 'E' && count < MAXSTEPS);
+		return path;
+	}
+
+	//update learning 
+	void updateFunction(position pos, int action )
+	{
+		position npos (pos.first + DIRECTIONS[action].first, pos.second + DIRECTIONS[action].first);
+
+		float reward = memory[npos].reward * multiplier + 0.1f;
+		
+		//UpdateReward();
+		if(memory[npos].reward > 1)
+			multiplier *= 2;
+		updateReward(npos);
+
+		//memory[pos].visided = true;
+		memory[pos].visits++;
+		//update maxQ value for the position given
+		findMaxQ( npos);
+
+		float learn = 1.0f/pow(1.1, memory[pos].visits);
+		//Q learning equation
+		memory[pos].Q[action] += learn * Alpha * (reward + (Gamma * memory[npos].maxQ) - memory[pos].Q[action]);
+		
+		updateSum(pos);
 	}
 };
 
