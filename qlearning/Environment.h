@@ -40,6 +40,7 @@ struct data
 	float Q[MAX_DIR];
 	float maxQ;
 	float sumQ;
+	float avgQ;
 
 	float initialReward;
 	float reward;
@@ -279,10 +280,10 @@ private:
 				position pos(x,y);
 				memory[pos] = data();
 				for(int i = 0; i < MAX_DIR; i++){
-					memory[pos].Q[i] = .5f;
+					memory[pos].Q[i] = 1.0f;
 				}
-				memory[pos].maxQ = 0;
-				memory[pos].sumQ = 0;
+				memory[pos].maxQ = 1;
+				memory[pos].sumQ = 8;
 				
 				memory[pos].initialReward = GetReward(pos);
 				memory[pos].reward = memory[pos].initialReward;
@@ -299,7 +300,6 @@ private:
 			for(int x = 0; x < N; x++){
 				position pos(x,y);
 				memory[pos].visided = false;
-				//memory[pos].visits = 0;
 				memory[pos].reward = memory[pos].initialReward;
 			}
 		}
@@ -322,8 +322,8 @@ private:
 			return 'X';
 
 		//check of the player position
-		if(B.first == x && B.second == y)
-			return 'B';
+		//if(B.first == x && B.second == y)
+		//	return 'B';
 		//check exit
 		if(E.first == x && E.second == y)
 			return 'E';
@@ -366,12 +366,13 @@ private:
 		do {
 			int i= 0;
 			action = getRand(0,MAX_DIR);
-			checked[action] = true;
+			
 			for(i = 0; i < MAX_DIR; i++)
 				if(checked[i] ==false)
 					break;
 			if( i == MAX_DIR)
 				return -1;
+			checked[action] = true;
 		} while (!validMove(pos, action));
 		return action;
 	}
@@ -394,7 +395,8 @@ private:
 		}else{
 			float prob;
 			action = getRandomAction(pos);
-
+			if(memory[pos].sumQ == 0)
+				return action;
 			for (count = 0 ; count < MAX_DIR ; count++) {
 				prob = (memory[pos].Q[action] / memory[pos].sumQ);
 				if (validMove(pos, action)) {
@@ -439,6 +441,15 @@ private:
 	}
 
 
+	void finAvgQ(position pos)
+	{
+		memory[pos].avgQ = 0.0f;
+		for(int i = 0; i < MAX_DIR; i++)
+		{
+			memory[pos].avgQ += memory[pos].Q[i];
+		}
+		memory[pos].avgQ /= MAX_DIR;
+	}
 
 	//find max Q value for the given position
 	void findMaxQ(position pos)
@@ -446,8 +457,11 @@ private:
 		memory[pos].maxQ = 0.0f;
 		for(int i = 0; i < MAX_DIR; i++)
 		{
-			if( memory[pos].Q[i] > memory[pos].maxQ )
-				memory[pos].maxQ = memory[pos].Q[i];
+			int x = pos.first + DIRECTIONS[i].first;
+			int y = pos.second + DIRECTIONS[i].second;
+			if(  (( 0 <= x && x < N) && ( 0 <= y && y < N)) )
+				if( memory[pos].Q[i] > memory[pos].maxQ )
+					memory[pos].maxQ = memory[pos].Q[i];
 		}
 	}
 
@@ -475,9 +489,9 @@ public:
 
 	QLearning(std::string filename)
 	{
-		R_Esc = 110; //reward for escaping
-		R_Pon = 100; //reward for ponies
-		R_Tro = -110; //reward for trolls
+		R_Esc = 11; //reward for escaping
+		R_Pon = 10; //reward for ponies
+		R_Tro = -11; //reward for trolls
 		R_Otl = 1; //reward for open field
 
 		Alpha = 0.75f;
@@ -488,6 +502,41 @@ public:
 		resetStates();
 	}
 	
+	QLearning(std::string filename, float alpha, float gamma)
+	{
+		R_Esc =  11; //reward for escaping
+		R_Pon =  10; //reward for ponies
+		R_Tro = -11; //reward for trolls
+		R_Otl =   1; //reward for open field
+
+		Alpha = alpha;
+		Gamma = gamma;
+
+		int e = readFile(filename);
+		if( e != 0)
+			std::cout <<"ERROR READING FILE: " << e;
+		initState();
+		resetStates();
+	}
+
+	QLearning(std::string filename, float alpha, float gamma, int esc, int pon, int tro, int otl)
+	{
+		R_Esc =  esc; //reward for escaping
+		R_Pon =  pon; //reward for ponies
+		R_Tro =  tro; //reward for trolls
+		R_Otl =  otl; //reward for open field
+
+		Alpha = alpha;
+		Gamma = gamma;
+
+		int e = readFile(filename);
+		if( e != 0)
+			std::cout <<"ERROR READING FILE: " << e;
+		initState();
+		resetStates();
+	}
+
+
 	//draw current QLearning state to a display ostream
 	void printState(std::ostream & display)
 	{
@@ -554,38 +603,87 @@ public:
 		int count = 0;
 		int action = -1;
 		position pos = getRandomPosition();
-
+		//position ipos = pos;
 		while(count < steps)
 		{
 			action = chooseAction(pos,false);
 			if(action == -1){
 				resetStates();
 				pos = getRandomPosition();
+				//pos = ipos;
 			}else{
 				updateFunction(pos, action);
 				pos.first += DIRECTIONS[action].first;
 				pos.second+= DIRECTIONS[action].second;
-				if( getEntity(pos.first, pos.second) == 'E'){
+				char e = getEntity(pos.first, pos.second);
+				if( e == 'E' || e == 'T' ){
 					resetStates();
 					pos = getRandomPosition();
+					//pos = ipos;
 				}
 			}
 			count++;
 		}
 	}
 
+
+
+	//update learning 
+	void updateFunction(position pos, int action )
+	{
+		position npos (pos.first + DIRECTIONS[action].first, pos.second + DIRECTIONS[action].first);
+
+		float reward = memory[npos].reward;// + 0.1f;
+		memory[pos].visided = true;
+		//memory[pos].reward = 1;
+		//memory[pos].reward /= 2;
+		//memory[npos].reward = pow((double)reward, 2.5);
+		//memory[npos].reward -= 0.01f;
+		//if(memory[npos].reward < .1f)
+		//	memory[npos].reward = .1f;
+		findMaxQ( npos);
+		//finAvgQ( npos);
+		memory[pos].Q[action] += Alpha * (reward + (Gamma *( memory[npos].maxQ)) - memory[pos].Q[action]);
+		//memory[pos].Q[action] /= 2;
+		
+		updateSum(pos);
+	}
+
+	void printQs(std::ostream & display)
+	{
+		//std::vector<position> path = GeneratePath();
+		resetStates();
+		for(int y = -1; y < N+1; y++){
+			for(int x = -1; x < N+1; x++){
+				if( y == -1 || x == -1 || y == N || x == N){
+					display << "#####";
+				}else{
+					position p(x,y);
+					findMaxQ(p);
+					display  << std::fixed << std::setw(5) << std::setprecision(2) << memory[p].maxQ;
+				}
+				display << " ";
+
+			}
+			display << "\n";
+
+		}
+
+	}
+
+
 	std::vector<position> GeneratePath()
 	{
 		std::vector<position> path;
 
-		int MAXSTEPS = 100000;
+		int MAXSTEPS = 1000000;
 		int count = 0;
 		int action = -1;
 		position pos = getRandomPosition();
 		path.push_back(pos);
 		
 		do{
-			action = chooseAction(pos,true);
+			action = chooseAction(pos,false);
 			if(action == -1){
 				resetStates();
 				path.clear();
@@ -597,39 +695,16 @@ public:
 				pos.first += DIRECTIONS[action].first;
 				pos.second+= DIRECTIONS[action].second;
 				path.push_back(pos);
-				//if( getEntity(pos.first, pos.second) == 'E'){
-				//	resetVisited();
-				//	pos = getRandomPosition();
-				//}
+				if( getEntity(pos.first, pos.second) == 'T'){
+					resetStates();
+					path.clear();
+					pos = getRandomPosition();
+				}
 			}
 
 			count++;
-		}while(getEntity(pos.first,pos.second) != 'E' && count < MAXSTEPS);
+		}while(getEntity(pos.first,pos.second) != 'E'  && count < MAXSTEPS);
 		return path;
-	}
-
-	//update learning 
-	void updateFunction(position pos, int action )
-	{
-		position npos (pos.first + DIRECTIONS[action].first, pos.second + DIRECTIONS[action].first);
-
-		float reward = memory[npos].reward * multiplier + 0.1f;
-		
-		//UpdateReward();
-		if(memory[npos].reward > 1)
-			multiplier *= 2;
-		updateReward(npos);
-
-		//memory[pos].visided = true;
-		memory[pos].visits++;
-		//update maxQ value for the position given
-		findMaxQ( npos);
-
-		float learn = 1.0f/pow(1.1, memory[pos].visits);
-		//Q learning equation
-		memory[pos].Q[action] += learn * Alpha * (reward + (Gamma * memory[npos].maxQ) - memory[pos].Q[action]);
-		
-		updateSum(pos);
 	}
 };
 
