@@ -10,44 +10,45 @@
 #include <cstdlib>
 #include <iomanip>
 
-float getRandF()
+double getRandF()
 {
-	return (((float)rand())/((float)RAND_MAX));
+	return (((double)rand())/((double)RAND_MAX));
 }
 
 int getRand(int min,int max)
 {
-	return min + rand()%(max-min);
+	return min + (int)((double)(max-min)*rand()/(RAND_MAX+1.0));
+	//return min + rand()%(max-min);
 }
 
 typedef std::pair<int,int> position;
 
 const int MAX_DIR = 8;
 const position DIRECTIONS[MAX_DIR]={
-	//position(  0,  0),  /* NM */
-	position(   0,  1),	/* N  */
-	position(   1,  1),	/* NE */
+	//position(  x,  y),  /* NM */
+	position(   0, -1),	/* N  */
+	position(   1, -1),	/* NE */
 	position(   1,  0),	/* E  */
-	position(   1, -1),	/* SE */
-	position(   0, -1),	/* S  */
-	position(  -1, -1),	/* SW */
+	position(   1,  1),	/* SE */
+	position(   0,  1),	/* S  */
+	position(  -1,  1),	/* SW */
 	position(  -1,  0),	/* W  */
-	position(  -1,  1)	/* NW */
+	position(  -1, -1)	/* NW */
 };
 
 struct data
 {
-	float Q[MAX_DIR];
-	float maxQ;
-	float sumQ;
-	float avgQ;
+	double Q[MAX_DIR];
+	double maxQ;
+	double sumQ;
+	double avgQ;
 
-	float initialReward;
-	float reward;
+	double initialReward;
+	double reward;
 
 	bool visided;
 	int visits;
-	//float reward;
+	//double reward;
 };
 
 
@@ -137,15 +138,15 @@ class QLearning
 {
 private:
 	//Rewards
-	float R_Esc; //reward for escaping
-	float R_Pon; //reward for ponies
-	float R_Tro; //reward for trolls
-	float R_Otl; //reward for open field
+	double R_Esc; //reward for escaping
+	double R_Pon; //reward for ponies
+	double R_Tro; //reward for trolls
+	double R_Otl; //reward for open field
 	
 	//learning parameter
-	float Alpha;
-	float Gamma;
-
+	double Alpha;
+	double Gamma;
+	double Beta; //explore rate
 	int N; //QLearning size
 	int T; //number of trolls
 	int P; // number of ponies
@@ -177,7 +178,7 @@ private:
 	}
 
 	//learning variable
-	float multiplier;
+	double multiplier;
 
 	//pares file and build the QLearning from the data readed
 	//the data is writed to the private variables
@@ -280,10 +281,10 @@ private:
 				position pos(x,y);
 				memory[pos] = data();
 				for(int i = 0; i < MAX_DIR; i++){
-					memory[pos].Q[i] = 1.0f;
+					memory[pos].Q[i] = .125;
 				}
-				memory[pos].maxQ = 1;
-				memory[pos].sumQ = 8;
+				memory[pos].maxQ = .125;
+				memory[pos].sumQ = 1;
 				
 				memory[pos].initialReward = GetReward(pos);
 				memory[pos].reward = memory[pos].initialReward;
@@ -296,6 +297,7 @@ private:
 	//reset visited state
 	void resetStates()
 	{
+		B = position(-1,-1);
 		for(int y = 0; y < N; y++){
 			for(int x = 0; x < N; x++){
 				position pos(x,y);
@@ -322,8 +324,8 @@ private:
 			return 'X';
 
 		//check of the player position
-		//if(B.first == x && B.second == y)
-		//	return 'B';
+		if(B.first == x && B.second == y)
+			return 'B';
 		//check exit
 		if(E.first == x && E.second == y)
 			return 'E';
@@ -357,6 +359,13 @@ private:
 		return !(Contains(obs, position(x,y))) && x >= 0 && y >= 0 && x < N && y < N && !(memory[position(x,y)].visided);
 	}
 
+	bool validPosition(position pos)
+	{
+		int x = pos.first;
+		int y = pos.second;
+		return !(Contains(obs, position(x,y))) && x >= 0 && y >= 0 && x < N && y < N && !(memory[position(x,y)].visided);
+	}
+
 
 	//chose a random action
 	int getRandomAction( position pos )
@@ -381,26 +390,29 @@ private:
 	int chooseAction( position pos, bool greedy)
 	{
 		findMaxQ(pos);
-		updateSum(pos);
+		//updateSum(pos);
 		int action;
 		int count = 0;
 		if(greedy){
-
+			double qmax = 0;
+			int qaction = -1;
 			for(action = 0; action < MAX_DIR; action++)
 			{
-				if(memory[pos].maxQ == memory[pos].Q[action])
-					if(validMove(pos, action))
-						return action;
+				if(memory[pos].Q[action] >= qmax && validMove(pos, action)){
+					qaction = action;
+					qmax = memory[pos].Q[action];
+				}
 			}
+			return qaction;
 		}else{
-			float prob;
+			double prob;
 			action = getRandomAction(pos);
-			if(memory[pos].sumQ == 0)
+			if(memory[pos].sumQ == 0 || Beta > getRandF())
 				return action;
 			for (count = 0 ; count < MAX_DIR ; count++) {
 				prob = (memory[pos].Q[action] / memory[pos].sumQ);
 				if (validMove(pos, action)) {
-					if (prob > getRandF()) {
+					if (prob >= getRandF()) {
 						return action;
 					}
 				}
@@ -423,19 +435,22 @@ private:
 	}
 
 	//for the given position return reward value
-	float GetReward(position pos)
+	double GetReward(position pos)
 	{
 		char c = getEntity(pos.first, pos.second);
 
 		switch(c){
 		case 'P':
-			return R_Pon;
+			return R_Pon;	//ponies
 		case 'T':
-			return R_Tro;
+			return R_Tro;	//trolls
 		case 'E':
-			return R_Esc;
+			return R_Esc;	//escape
+		case '-':
+		case 'B':
+			return R_Otl;	//open field
 		default:
-			return R_Otl;
+			return -1;
 		}
 		return -1;
 	}
@@ -457,11 +472,8 @@ private:
 		memory[pos].maxQ = 0.0f;
 		for(int i = 0; i < MAX_DIR; i++)
 		{
-			int x = pos.first + DIRECTIONS[i].first;
-			int y = pos.second + DIRECTIONS[i].second;
-			if(  (( 0 <= x && x < N) && ( 0 <= y && y < N)) )
-				if( memory[pos].Q[i] > memory[pos].maxQ )
-					memory[pos].maxQ = memory[pos].Q[i];
+			if( memory[pos].Q[i] > memory[pos].maxQ )
+				memory[pos].maxQ = memory[pos].Q[i];
 		}
 	}
 
@@ -479,9 +491,12 @@ private:
 	//
 	position getRandomPosition()
 	{
-		position p;
-		p.first = getRand(0,N);
-		p.second = getRand(0,N);
+
+		position p(-1,-1);
+		while(!validPosition(p) || getEntity(p.first,p.second) != '-'){
+			p.first = getRand(0,N);
+			p.second = getRand(0,N);
+		}
 		return p;
 	}
 
@@ -496,13 +511,13 @@ public:
 
 		Alpha = 0.75f;
 		Gamma = 0.5f;
-
+		Beta  = 0.4f;
 		readFile(filename);
 		initState();
 		resetStates();
 	}
 	
-	QLearning(std::string filename, float alpha, float gamma)
+	QLearning(std::string filename, double alpha, double gamma)
 	{
 		R_Esc =  11; //reward for escaping
 		R_Pon =  10; //reward for ponies
@@ -511,7 +526,7 @@ public:
 
 		Alpha = alpha;
 		Gamma = gamma;
-
+		Beta  = 0.4f;
 		int e = readFile(filename);
 		if( e != 0)
 			std::cout <<"ERROR READING FILE: " << e;
@@ -519,7 +534,7 @@ public:
 		resetStates();
 	}
 
-	QLearning(std::string filename, float alpha, float gamma, int esc, int pon, int tro, int otl)
+	QLearning(std::string filename, double alpha, double gamma, int esc, int pon, int tro, int otl)
 	{
 		R_Esc =  esc; //reward for escaping
 		R_Pon =  pon; //reward for ponies
@@ -528,7 +543,7 @@ public:
 
 		Alpha = alpha;
 		Gamma = gamma;
-
+		Beta  = 0.4f;
 		int e = readFile(filename);
 		if( e != 0)
 			std::cout <<"ERROR READING FILE: " << e;
@@ -536,6 +551,22 @@ public:
 		resetStates();
 	}
 
+	QLearning(std::string filename, double alpha, double gamma,double beta, int esc, int pon, int tro, int otl)
+	{
+		R_Esc =  esc; //reward for escaping
+		R_Pon =  pon; //reward for ponies
+		R_Tro =  tro; //reward for trolls
+		R_Otl =  otl; //reward for open field
+
+		Alpha = alpha;
+		Gamma = gamma;
+		Beta  = 0.2f;
+		int e = readFile(filename);
+		if( e != 0)
+			std::cout <<"ERROR READING FILE: " << e;
+		initState();
+		resetStates();
+	}
 
 	//draw current QLearning state to a display ostream
 	void printState(std::ostream & display)
@@ -559,11 +590,48 @@ public:
 		for(int y = -1; y < N+1; y++){
 			for(int x = -1; x < N+1; x++){
 				if( y == -1 || x == -1 || y == N || x == N){
-					display << "#####";
+					display << "##";
 				}else{
-					position p(x,y);
-					findMaxQ(p);
-					display << std::setw(2) << DIRECTIONS[chooseAction(position(x,y),true)].first<< "," << std::setw(2)<<DIRECTIONS[chooseAction(position(x,y),true)].second;
+					int i = chooseAction(position(x,y),true);
+					switch (i){
+					case 0:
+						display << std::setw(2) << " N";
+						break;
+					case 1:
+						display << std::setw(2) << "NE";
+						break;
+					case 2:
+						display << std::setw(2) << " E";
+						break;
+					case 3:
+						display << std::setw(2) << "SE";
+						break;
+					case 4:
+						display << std::setw(2) << "S";
+						break;
+					case 5:
+						display << std::setw(2) << "SW";
+						break;
+					case 6:
+						display << std::setw(2) << "W";
+						break;
+					case 7:
+						display << std::setw(2) << "NW";
+						break;
+					default:
+						display << std::setw(2) << "##";
+					}
+					//position(   0,  1),	/* N  */
+					//position(   1,  1),	/* NE */
+					//position(   1,  0),	/* E  */
+					//position(   1, -1),	/* SE */
+					//position(   0, -1),	/* S  */
+					//position(  -1, -1),	/* SW */
+					//position(  -1,  0),	/* W  */
+					//position(  -1,  1)	/* NW */
+					//position p(x,y);
+					//findMaxQ(p);
+					//display << std::setw(2) << DIRECTIONS[chooseAction(position(x,y),true)].first<< "," << std::setw(2)<<DIRECTIONS[chooseAction(position(x,y),true)].second;
 				}
 				display << " ";
 			}
@@ -573,8 +641,8 @@ public:
 	
 	void printPath(std::ostream & display)
 	{
-		std::vector<position> path = GeneratePath();
 		resetStates();
+		std::vector<position> path = GeneratePath();
 		for(int y = -1; y < N+1; y++){
 			for(int x = -1; x < N+1; x++){
 				if( y == -1 || x == -1 || y == N || x == N){
@@ -600,6 +668,7 @@ public:
 
 	//
 	void learningPhase(int steps){
+		resetStates();
 		int count = 0;
 		int action = -1;
 		position pos = getRandomPosition();
@@ -612,7 +681,7 @@ public:
 				pos = getRandomPosition();
 				//pos = ipos;
 			}else{
-				updateFunction(pos, action);
+				updateFunction(pos, action,true);
 				pos.first += DIRECTIONS[action].first;
 				pos.second+= DIRECTIONS[action].second;
 				char e = getEntity(pos.first, pos.second);
@@ -629,25 +698,28 @@ public:
 
 
 	//update learning 
-	void updateFunction(position pos, int action )
+	void updateFunction(position pos, int action, bool update )
 	{
 		position npos (pos.first + DIRECTIONS[action].first, pos.second + DIRECTIONS[action].first);
-
-		float reward = memory[npos].reward;// + 0.1f;
-		memory[pos].visided = true;
-		//memory[pos].reward = 1;
-		//memory[pos].reward /= 2;
-		//memory[npos].reward = pow((double)reward, 2.5);
-		//memory[npos].reward -= 0.01f;
-		//if(memory[npos].reward < .1f)
-		//	memory[npos].reward = .1f;
-		findMaxQ( npos);
-		//finAvgQ( npos);
-		memory[pos].Q[action] += Alpha * (reward + (Gamma *( memory[npos].maxQ)) - memory[pos].Q[action]);
-		//memory[pos].Q[action] /= 2;
 		
-		updateSum(pos);
+		//
+		memory[pos].visided = true;
+		if(update){
+			double reward = memory[npos].reward*(1+.5*this->multiplier);// + 0.1f;
+			if(memory[npos].reward == R_Pon)
+			{
+				memory[npos].reward = R_Otl;
+				multiplier++;
+			}
+			findMaxQ( npos);
+
+			memory[pos].Q[action] += Alpha * (reward + (Gamma *( memory[npos].maxQ) )- memory[pos].Q[action]);
+
+			updateSum(pos);
+		}
 	}
+
+
 
 	void printQs(std::ostream & display)
 	{
@@ -674,16 +746,17 @@ public:
 
 	std::vector<position> GeneratePath()
 	{
+		resetStates();
 		std::vector<position> path;
 
-		int MAXSTEPS = 1000000;
+		int MAXSTEPS = 100000;
 		int count = 0;
 		int action = -1;
 		position pos = getRandomPosition();
 		path.push_back(pos);
 		
 		do{
-			action = chooseAction(pos,false);
+			action = chooseAction(pos,true);
 			if(action == -1){
 				resetStates();
 				path.clear();
@@ -691,7 +764,7 @@ public:
 				path.push_back(pos);
 			}else{
 				
-				updateFunction(pos, action);
+				updateFunction(pos, action,false);
 				pos.first += DIRECTIONS[action].first;
 				pos.second+= DIRECTIONS[action].second;
 				path.push_back(pos);
@@ -699,12 +772,47 @@ public:
 					resetStates();
 					path.clear();
 					pos = getRandomPosition();
+					path.push_back(pos);
 				}
 			}
 
 			count++;
 		}while(getEntity(pos.first,pos.second) != 'E'  && count < MAXSTEPS);
 		return path;
+	}
+
+	void printAgentRun(std::ostream & display)
+	{
+		resetStates();
+		std::vector<position> path = GeneratePath();
+		B = path[0];
+		//print inital state
+		printState(display);
+		B = path[path.size()-1];
+		//print final state
+		int pcount = 0;
+		for(int y = -1; y < N+1; y++){
+			for(int x = -1; x < N+1; x++){
+				if( y == -1 || x == -1 || y == N || x == N){
+					display << "#";
+				}else{
+					char c = getEntity(x,y);
+					if( Contains(path, position(x,y))){
+						if(c == 'P'){
+							pcount++;
+						}
+						if( c == 'T')
+							std::cout << "Death";
+						c = 'O';
+					}
+					display << c;
+				}
+				display << " ";
+			}
+			display << "\n";
+		}
+		display << "Rescues: " << ((double)pcount/(double)ponies.size())*100 << "%\n";
+
 	}
 };
 
